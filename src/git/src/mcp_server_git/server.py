@@ -65,6 +65,9 @@ class GitShow(BaseModel):
 class GitInit(BaseModel):
     repo_path: str
 
+class GitLsFiles(BaseModel):
+    repo_path: str
+
 class GitTools(str, Enum):
     STATUS = "git_status"
     DIFF_UNSTAGED = "git_diff_unstaged"
@@ -78,6 +81,7 @@ class GitTools(str, Enum):
     CHECKOUT = "git_checkout"
     SHOW = "git_show"
     INIT = "git_init"
+    LS_FILES = "git_ls_files"
 
 def git_status(repo: git.Repo) -> str:
     try:
@@ -171,6 +175,12 @@ def git_show(repo: git.Repo, revision: str) -> str:
     except (git.GitCommandError, ValueError) as e:
         return f"Error showing commit {revision}: {e}"
 
+def git_ls_files(repo: git.Repo) -> str:
+    try:
+        return repo.git.ls_files()
+    except git.GitCommandError as e:
+        return f"Error listing tracked files: {e}"
+
 async def serve(repository: Path | None) -> None:
     logger = logging.getLogger(__name__)
 
@@ -246,6 +256,11 @@ async def serve(repository: Path | None) -> None:
                 name=GitTools.INIT,
                 description="Initialize a new Git repository. The repo_path is the directory where the repository will be initialized.",
                 inputSchema=GitInit.schema(),
+            ),
+            Tool(
+                name=GitTools.LS_FILES,
+                description="Lists all tracked files in the repository. The repo_path must be the Git repository root.",
+                inputSchema=GitLsFiles.schema(),
             )
         ]
 
@@ -400,6 +415,14 @@ async def serve(repository: Path | None) -> None:
         elif name == GitTools.SHOW.value:  # Use .value
             logging.error(f"[DEBUG] Matched SHOW using .value")
             result = git_show(repo, arguments["revision"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
+        
+        elif name == GitTools.LS_FILES.value:  # Use .value
+            logging.error(f"[DEBUG] Matched LS_FILES using .value")
+            result = git_ls_files(repo)
             return [TextContent(
                 type="text",
                 text=result
