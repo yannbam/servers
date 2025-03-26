@@ -80,15 +80,23 @@ class GitTools(str, Enum):
     INIT = "git_init"
 
 def git_status(repo: git.Repo) -> str:
+    logging.error(f"[DEBUG] git_status called for repo: {repo.working_dir}")
     try:
-        return repo.git.status()
+        status = repo.git.status()
+        logging.error(f"[DEBUG] git_status result: {status[:100]}...")
+        return status
     except git.GitCommandError as e:
+        logging.error(f"[DEBUG] git_status error: {e}")
         return f"Error getting status: {e}"
 
 def git_diff_unstaged(repo: git.Repo) -> str:
+    logging.error(f"[DEBUG] git_diff_unstaged called for repo: {repo.working_dir}")
     try:
-        return repo.git.diff()
+        diff = repo.git.diff()
+        logging.error(f"[DEBUG] git_diff_unstaged result length: {len(diff)}")
+        return diff
     except git.GitCommandError as e:
+        logging.error(f"[DEBUG] git_diff_unstaged error: {e}")
         return f"Error getting unstaged diff: {e}"
 
 def git_diff_staged(repo: git.Repo) -> str:
@@ -116,8 +124,10 @@ def git_reset(repo: git.Repo) -> str:
     return "All staged changes reset"
 
 def git_log(repo: git.Repo, max_count: int = 10) -> str:
+    logging.error(f"[DEBUG] git_log called for repo: {repo.working_dir} with max_count: {max_count}")
     try:
         commits = list(repo.iter_commits(max_count=max_count))
+        logging.error(f"[DEBUG] git_log found {len(commits)} commits")
         log = []
         for commit in commits:
             log.append(
@@ -126,8 +136,11 @@ def git_log(repo: git.Repo, max_count: int = 10) -> str:
                 f"Date: {commit.authored_datetime}\n"
                 f"Message: {commit.message}\n"
             )
-        return "\n".join(log)
+        result = "\n".join(log)
+        logging.error(f"[DEBUG] git_log result length: {len(result)}")
+        return result
     except git.GitCommandError as e:
+        logging.error(f"[DEBUG] git_log error: {e}")
         return f"Error getting commit logs: {e}"
 
 def git_create_branch(repo: git.Repo, branch_name: str, base_branch: str | None = None) -> str:
@@ -280,6 +293,7 @@ async def serve(repository: Path | None) -> None:
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+        logging.error(f"[DEBUG] call_tool called with name: {name}, arguments: {arguments}")
         repo_path = Path(arguments["repo_path"])
         
         # Handle git init separately since it doesn't require an existing repo
@@ -295,11 +309,15 @@ async def serve(repository: Path | None) -> None:
 
         match name:
             case GitTools.STATUS:
+                logging.error(f"[DEBUG] Processing GitTools.STATUS")
                 status = git_status(repo)
-                return [TextContent(
+                logging.error(f"[DEBUG] Status result received, length: {len(status)}")
+                result = [TextContent(
                     type="text",
                     text=status
                 )]
+                logging.error(f"[DEBUG] Returning TextContent with status")
+                return result
 
             case GitTools.DIFF_UNSTAGED:
                 diff = git_diff_unstaged(repo)
@@ -344,11 +362,15 @@ async def serve(repository: Path | None) -> None:
                 )]
 
             case GitTools.LOG:
+                logging.error(f"[DEBUG] Processing GitTools.LOG")
                 log = git_log(repo, arguments.get("max_count", 10))
-                return [TextContent(
+                logging.error(f"[DEBUG] Log result received, length: {len(log)}")
+                result = [TextContent(
                     type="text",
                     text=log
                 )]
+                logging.error(f"[DEBUG] Returning TextContent with log")
+                return result
 
             case GitTools.CREATE_BRANCH:
                 result = git_create_branch(
