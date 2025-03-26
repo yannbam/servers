@@ -80,16 +80,28 @@ class GitTools(str, Enum):
     INIT = "git_init"
 
 def git_status(repo: git.Repo) -> str:
-    return repo.git.status()
+    try:
+        return repo.git.status()
+    except git.GitCommandError as e:
+        return f"Error getting status: {e}"
 
 def git_diff_unstaged(repo: git.Repo) -> str:
-    return repo.git.diff()
+    try:
+        return repo.git.diff()
+    except git.GitCommandError as e:
+        return f"Error getting unstaged diff: {e}"
 
 def git_diff_staged(repo: git.Repo) -> str:
-    return repo.git.diff("--cached")
+    try:
+        return repo.git.diff("--cached")
+    except git.GitCommandError as e:
+        return f"Error getting staged diff: {e}"
 
 def git_diff(repo: git.Repo, target: str) -> str:
-    return repo.git.diff(target)
+    try:
+        return repo.git.diff(target)
+    except git.GitCommandError as e:
+        return f"Error getting diff with {target}: {e}"
 
 def git_commit(repo: git.Repo, message: str) -> str:
     commit = repo.index.commit(message)
@@ -103,17 +115,20 @@ def git_reset(repo: git.Repo) -> str:
     repo.index.reset()
     return "All staged changes reset"
 
-def git_log(repo: git.Repo, max_count: int = 10) -> list[str]:
-    commits = list(repo.iter_commits(max_count=max_count))
-    log = []
-    for commit in commits:
-        log.append(
-            f"Commit: {commit.hexsha}\n"
-            f"Author: {commit.author}\n"
-            f"Date: {commit.authored_datetime}\n"
-            f"Message: {commit.message}\n"
-        )
-    return log
+def git_log(repo: git.Repo, max_count: int = 10) -> str:
+    try:
+        commits = list(repo.iter_commits(max_count=max_count))
+        log = []
+        for commit in commits:
+            log.append(
+                f"Commit: {commit.hexsha}\n"
+                f"Author: {commit.author}\n"
+                f"Date: {commit.authored_datetime}\n"
+                f"Message: {commit.message}\n"
+            )
+        return "\n".join(log)
+    except git.GitCommandError as e:
+        return f"Error getting commit logs: {e}"
 
 def git_create_branch(repo: git.Repo, branch_name: str, base_branch: str | None = None) -> str:
     if base_branch:
@@ -136,22 +151,25 @@ def git_init(repo_path: str) -> str:
         return f"Error initializing repository: {str(e)}"
 
 def git_show(repo: git.Repo, revision: str) -> str:
-    commit = repo.commit(revision)
-    output = [
-        f"Commit: {commit.hexsha}\n"
-        f"Author: {commit.author}\n"
-        f"Date: {commit.authored_datetime}\n"
-        f"Message: {commit.message}\n"
-    ]
-    if commit.parents:
-        parent = commit.parents[0]
-        diff = parent.diff(commit, create_patch=True)
-    else:
-        diff = commit.diff(git.NULL_TREE, create_patch=True)
-    for d in diff:
-        output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
-        output.append(d.diff.decode('utf-8'))
-    return "".join(output)
+    try:
+        commit = repo.commit(revision)
+        output = [
+            f"Commit: {commit.hexsha}\n"
+            f"Author: {commit.author}\n"
+            f"Date: {commit.authored_datetime}\n"
+            f"Message: {commit.message}\n"
+        ]
+        if commit.parents:
+            parent = commit.parents[0]
+            diff = parent.diff(commit, create_patch=True)
+        else:
+            diff = commit.diff(git.NULL_TREE, create_patch=True)
+        for d in diff:
+            output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
+            output.append(d.diff.decode('utf-8'))
+        return "".join(output)
+    except (git.GitCommandError, ValueError) as e:
+        return f"Error showing commit {revision}: {e}"
 
 async def serve(repository: Path | None) -> None:
     logger = logging.getLogger(__name__)
@@ -280,28 +298,28 @@ async def serve(repository: Path | None) -> None:
                 status = git_status(repo)
                 return [TextContent(
                     type="text",
-                    text=f"Repository status:\n{status}"
+                    text=status
                 )]
 
             case GitTools.DIFF_UNSTAGED:
                 diff = git_diff_unstaged(repo)
                 return [TextContent(
                     type="text",
-                    text=f"Unstaged changes:\n{diff}"
+                    text=diff
                 )]
 
             case GitTools.DIFF_STAGED:
                 diff = git_diff_staged(repo)
                 return [TextContent(
                     type="text",
-                    text=f"Staged changes:\n{diff}"
+                    text=diff
                 )]
 
             case GitTools.DIFF:
                 diff = git_diff(repo, arguments["target"])
                 return [TextContent(
                     type="text",
-                    text=f"Diff with {arguments['target']}:\n{diff}"
+                    text=diff
                 )]
 
             case GitTools.COMMIT:
@@ -329,7 +347,7 @@ async def serve(repository: Path | None) -> None:
                 log = git_log(repo, arguments.get("max_count", 10))
                 return [TextContent(
                     type="text",
-                    text="Commit history:\n" + "\n".join(log)
+                    text=log
                 )]
 
             case GitTools.CREATE_BRANCH:
