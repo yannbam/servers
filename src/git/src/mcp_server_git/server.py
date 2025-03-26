@@ -4,16 +4,22 @@ from typing import Sequence
 from mcp.server import Server
 from mcp.server.session import ServerSession
 from mcp.server.stdio import stdio_server
+from mcp.server import NotificationOptions
+from mcp.server import InitializationOptions
 from mcp.types import (
     ClientCapabilities,
     TextContent,
     Tool,
     ListRootsResult,
     RootsCapability,
+    Resource,
+    Prompt
 )
+
 from enum import Enum
 import git
 from pydantic import BaseModel
+
 
 class GitStatus(BaseModel):
     repo_path: str
@@ -354,6 +360,27 @@ async def serve(repository: Path | None) -> None:
             case _:
                 raise ValueError(f"Unknown tool: {name}")
 
-    options = server.create_initialization_options()
+    @server.list_resources()
+    async def handle_list_resources() -> list[Resource]:
+        return []
+
+    @server.list_prompts()
+    async def handle_list_prompts() -> list[Prompt]:
+        return []
+
+    # Define notification options
+    notification_options = NotificationOptions(
+            prompts_changed=True,    
+            resources_changed=True,  
+            tools_changed=True      
+    )
+
+    # Create initialization options with these capabilities
+    options = server.create_initialization_options(
+        notification_options=notification_options,
+        experimental_capabilities={}
+    )
+
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, options, raise_exceptions=True)
+
