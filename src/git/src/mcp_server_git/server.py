@@ -299,6 +299,11 @@ async def serve(repository: Path | None) -> None:
         logging.error(f"[DEBUG] Direct comparison: {name == GitTools.STATUS}")
         
         repo_path = Path(arguments["repo_path"])
+        logging.error(f"[DEBUG] Repo path: {repo_path}, exists: {repo_path.exists()}, is_dir: {repo_path.is_dir()}")
+        
+        # Look for .git directory to verify it's a Git repo
+        git_dir = repo_path / ".git"
+        logging.error(f"[DEBUG] Git dir: {git_dir}, exists: {git_dir.exists()}, is_dir: {git_dir.is_dir()}")
         
         # Handle git init separately since it doesn't require an existing repo
         if name == GitTools.INIT.value:  # Use .value to compare string to enum
