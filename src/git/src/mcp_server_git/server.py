@@ -80,23 +80,15 @@ class GitTools(str, Enum):
     INIT = "git_init"
 
 def git_status(repo: git.Repo) -> str:
-    logging.error(f"[DEBUG] git_status called for repo: {repo.working_dir}")
     try:
-        status = repo.git.status()
-        logging.error(f"[DEBUG] git_status result: {status[:100]}...")
-        return status
+        return repo.git.status()
     except git.GitCommandError as e:
-        logging.error(f"[DEBUG] git_status error: {e}")
         return f"Error getting status: {e}"
 
 def git_diff_unstaged(repo: git.Repo) -> str:
-    logging.error(f"[DEBUG] git_diff_unstaged called for repo: {repo.working_dir}")
     try:
-        diff = repo.git.diff()
-        logging.error(f"[DEBUG] git_diff_unstaged result length: {len(diff)}")
-        return diff
+        return repo.git.diff()
     except git.GitCommandError as e:
-        logging.error(f"[DEBUG] git_diff_unstaged error: {e}")
         return f"Error getting unstaged diff: {e}"
 
 def git_diff_staged(repo: git.Repo) -> str:
@@ -124,10 +116,8 @@ def git_reset(repo: git.Repo) -> str:
     return "All staged changes reset"
 
 def git_log(repo: git.Repo, max_count: int = 10) -> str:
-    logging.error(f"[DEBUG] git_log called for repo: {repo.working_dir} with max_count: {max_count}")
     try:
         commits = list(repo.iter_commits(max_count=max_count))
-        logging.error(f"[DEBUG] git_log found {len(commits)} commits")
         log = []
         for commit in commits:
             log.append(
@@ -136,11 +126,8 @@ def git_log(repo: git.Repo, max_count: int = 10) -> str:
                 f"Date: {commit.authored_datetime}\n"
                 f"Message: {commit.message}\n"
             )
-        result = "\n".join(log)
-        logging.error(f"[DEBUG] git_log result length: {len(result)}")
-        return result
+        return "\n".join(log)
     except git.GitCommandError as e:
-        logging.error(f"[DEBUG] git_log error: {e}")
         return f"Error getting commit logs: {e}"
 
 def git_create_branch(repo: git.Repo, branch_name: str, base_branch: str | None = None) -> str:
@@ -202,62 +189,62 @@ async def serve(repository: Path | None) -> None:
         return [
             Tool(
                 name=GitTools.STATUS,
-                description="Shows the working tree status",
+                description="Shows the working tree status. The repo_path must be the Git repository root.",
                 inputSchema=GitStatus.schema(),
             ),
             Tool(
                 name=GitTools.DIFF_UNSTAGED,
-                description="Shows changes in the working directory that are not yet staged",
+                description="Shows changes in the working directory that are not yet staged. The repo_path must be the Git repository root.",
                 inputSchema=GitDiffUnstaged.schema(),
             ),
             Tool(
                 name=GitTools.DIFF_STAGED,
-                description="Shows changes that are staged for commit",
+                description="Shows changes that are staged for commit. The repo_path must be the Git repository root.",
                 inputSchema=GitDiffStaged.schema(),
             ),
             Tool(
                 name=GitTools.DIFF,
-                description="Shows differences between branches or commits",
+                description="Shows differences between branches or commits. The repo_path must be the Git repository root.",
                 inputSchema=GitDiff.schema(),
             ),
             Tool(
                 name=GitTools.COMMIT,
-                description="Records changes to the repository",
+                description="Records changes to the repository. The repo_path must be the Git repository root.",
                 inputSchema=GitCommit.schema(),
             ),
             Tool(
                 name=GitTools.ADD,
-                description="Adds file contents to the staging area",
+                description="Adds file contents to the staging area. The repo_path must be the Git repository root.",
                 inputSchema=GitAdd.schema(),
             ),
             Tool(
                 name=GitTools.RESET,
-                description="Unstages all staged changes",
+                description="Unstages all staged changes. The repo_path must be the Git repository root.",
                 inputSchema=GitReset.schema(),
             ),
             Tool(
                 name=GitTools.LOG,
-                description="Shows the commit logs",
+                description="Shows the commit logs. The repo_path must be the Git repository root.",
                 inputSchema=GitLog.schema(),
             ),
             Tool(
                 name=GitTools.CREATE_BRANCH,
-                description="Creates a new branch from an optional base branch",
+                description="Creates a new branch from an optional base branch. The repo_path must be the Git repository root.",
                 inputSchema=GitCreateBranch.schema(),
             ),
             Tool(
                 name=GitTools.CHECKOUT,
-                description="Switches branches",
+                description="Switches branches. The repo_path must be the Git repository root.",
                 inputSchema=GitCheckout.schema(),
             ),
             Tool(
                 name=GitTools.SHOW,
-                description="Shows the contents of a commit",
+                description="Shows the contents of a commit. The repo_path must be the Git repository root.",
                 inputSchema=GitShow.schema(),
             ),
             Tool(
                 name=GitTools.INIT,
-                description="Initialize a new Git repository",
+                description="Initialize a new Git repository. The repo_path is the directory where the repository will be initialized.",
                 inputSchema=GitInit.schema(),
             )
         ]
@@ -293,21 +280,10 @@ async def serve(repository: Path | None) -> None:
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-        logging.error(f"[DEBUG] call_tool called with name: {name}, arguments: {arguments}")
-        logging.error(f"[DEBUG] GitTools.STATUS value: {GitTools.STATUS}")
-        logging.error(f"[DEBUG] Type of name: {type(name)}, Type of GitTools.STATUS: {type(GitTools.STATUS)}")
-        logging.error(f"[DEBUG] Direct comparison: {name == GitTools.STATUS}")
-        
         repo_path = Path(arguments["repo_path"])
-        logging.error(f"[DEBUG] Repo path: {repo_path}, exists: {repo_path.exists()}, is_dir: {repo_path.is_dir()}")
-        
-        # Look for .git directory to verify it's a Git repo
-        git_dir = repo_path / ".git"
-        logging.error(f"[DEBUG] Git dir: {git_dir}, exists: {git_dir.exists()}, is_dir: {git_dir.is_dir()}")
         
         # Handle git init separately since it doesn't require an existing repo
-        if name == GitTools.INIT.value:  # Use .value to compare string to enum
-            logging.error(f"[DEBUG] Matched INIT using .value")
+        if name == GitTools.INIT.value:
             result = git_init(str(repo_path))
             return [TextContent(
                 type="text",
@@ -317,9 +293,19 @@ async def serve(repository: Path | None) -> None:
         # For all other commands, we need an existing repo
         try:
             repo = git.Repo(repo_path)
-            logging.error(f"[DEBUG] Successfully created repo object for {repo_path}")
+        except git.InvalidGitRepositoryError:
+            return [TextContent(
+                type="text",
+                text=(f"Error: '{repo_path}' is not a valid Git repository root. "
+                      f"Please provide the path to the repository root (the directory containing the '.git' folder), "
+                      f"not a subdirectory.")
+            )]
+        except git.NoSuchPathError:
+            return [TextContent(
+                type="text",
+                text=f"Error: Path '{repo_path}' does not exist."
+            )]
         except Exception as e:
-            logging.error(f"[DEBUG] Error creating repo object: {str(e)}")
             return [TextContent(
                 type="text",
                 text=f"Error accessing repository: {str(e)}"
@@ -329,16 +315,12 @@ async def serve(repository: Path | None) -> None:
         if name == GitTools.STATUS.value:  # Use .value
             logging.error(f"[DEBUG] Matched STATUS using .value")
 
-        if name == GitTools.STATUS.value:  # Use .value
-            logging.error(f"[DEBUG] Matched STATUS using .value")
+        if name == GitTools.STATUS.value:
             status = git_status(repo)
-            logging.error(f"[DEBUG] Status result received, length: {len(status)}")
-            result = [TextContent(
+            return [TextContent(
                 type="text",
                 text=status
             )]
-            logging.error(f"[DEBUG] Returning TextContent with status")
-            return result
 
         elif name == GitTools.DIFF_UNSTAGED.value:  # Use .value
             logging.error(f"[DEBUG] Matched DIFF_UNSTAGED using .value")
@@ -388,16 +370,12 @@ async def serve(repository: Path | None) -> None:
                 text=result
             )]
 
-        elif name == GitTools.LOG.value:  # Use .value
-            logging.error(f"[DEBUG] Matched LOG using .value")
+        elif name == GitTools.LOG.value:
             log = git_log(repo, int(arguments.get("max_count", 10)))
-            logging.error(f"[DEBUG] Log result received, length: {len(log)}")
-            result = [TextContent(
+            return [TextContent(
                 type="text",
                 text=log
             )]
-            logging.error(f"[DEBUG] Returning TextContent with log")
-            return result
 
         elif name == GitTools.CREATE_BRANCH.value:  # Use .value
             logging.error(f"[DEBUG] Matched CREATE_BRANCH using .value")
