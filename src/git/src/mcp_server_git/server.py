@@ -294,10 +294,15 @@ async def serve(repository: Path | None) -> None:
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         logging.error(f"[DEBUG] call_tool called with name: {name}, arguments: {arguments}")
+        logging.error(f"[DEBUG] GitTools.STATUS value: {GitTools.STATUS}")
+        logging.error(f"[DEBUG] Type of name: {type(name)}, Type of GitTools.STATUS: {type(GitTools.STATUS)}")
+        logging.error(f"[DEBUG] Direct comparison: {name == GitTools.STATUS}")
+        
         repo_path = Path(arguments["repo_path"])
         
         # Handle git init separately since it doesn't require an existing repo
-        if name == GitTools.INIT:
+        if name == GitTools.INIT.value:  # Use .value to compare string to enum
+            logging.error(f"[DEBUG] Matched INIT using .value")
             result = git_init(str(repo_path))
             return [TextContent(
                 type="text",
@@ -305,100 +310,121 @@ async def serve(repository: Path | None) -> None:
             )]
             
         # For all other commands, we need an existing repo
-        repo = git.Repo(repo_path)
+        try:
+            repo = git.Repo(repo_path)
+            logging.error(f"[DEBUG] Successfully created repo object for {repo_path}")
+        except Exception as e:
+            logging.error(f"[DEBUG] Error creating repo object: {str(e)}")
+            return [TextContent(
+                type="text",
+                text=f"Error accessing repository: {str(e)}"
+            )]
 
-        match name:
-            case GitTools.STATUS:
-                logging.error(f"[DEBUG] Processing GitTools.STATUS")
-                status = git_status(repo)
-                logging.error(f"[DEBUG] Status result received, length: {len(status)}")
-                result = [TextContent(
-                    type="text",
-                    text=status
-                )]
-                logging.error(f"[DEBUG] Returning TextContent with status")
-                return result
+        # Use string comparison instead of enum comparison
+        if name == GitTools.STATUS.value:  # Use .value
+            logging.error(f"[DEBUG] Matched STATUS using .value")
 
-            case GitTools.DIFF_UNSTAGED:
-                diff = git_diff_unstaged(repo)
-                return [TextContent(
-                    type="text",
-                    text=diff
-                )]
+        if name == GitTools.STATUS.value:  # Use .value
+            logging.error(f"[DEBUG] Matched STATUS using .value")
+            status = git_status(repo)
+            logging.error(f"[DEBUG] Status result received, length: {len(status)}")
+            result = [TextContent(
+                type="text",
+                text=status
+            )]
+            logging.error(f"[DEBUG] Returning TextContent with status")
+            return result
 
-            case GitTools.DIFF_STAGED:
-                diff = git_diff_staged(repo)
-                return [TextContent(
-                    type="text",
-                    text=diff
-                )]
+        elif name == GitTools.DIFF_UNSTAGED.value:  # Use .value
+            logging.error(f"[DEBUG] Matched DIFF_UNSTAGED using .value")
+            diff = git_diff_unstaged(repo)
+            return [TextContent(
+                type="text",
+                text=diff
+            )]
 
-            case GitTools.DIFF:
-                diff = git_diff(repo, arguments["target"])
-                return [TextContent(
-                    type="text",
-                    text=diff
-                )]
+        elif name == GitTools.DIFF_STAGED.value:  # Use .value
+            logging.error(f"[DEBUG] Matched DIFF_STAGED using .value")
+            diff = git_diff_staged(repo)
+            return [TextContent(
+                type="text",
+                text=diff
+            )]
 
-            case GitTools.COMMIT:
-                result = git_commit(repo, arguments["message"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.DIFF.value:  # Use .value
+            logging.error(f"[DEBUG] Matched DIFF using .value")
+            diff = git_diff(repo, arguments["target"])
+            return [TextContent(
+                type="text",
+                text=diff
+            )]
 
-            case GitTools.ADD:
-                result = git_add(repo, arguments["files"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.COMMIT.value:  # Use .value
+            logging.error(f"[DEBUG] Matched COMMIT using .value")
+            result = git_commit(repo, arguments["message"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.RESET:
-                result = git_reset(repo)
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.ADD.value:  # Use .value
+            logging.error(f"[DEBUG] Matched ADD using .value")
+            result = git_add(repo, arguments["files"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.LOG:
-                logging.error(f"[DEBUG] Processing GitTools.LOG")
-                log = git_log(repo, arguments.get("max_count", 10))
-                logging.error(f"[DEBUG] Log result received, length: {len(log)}")
-                result = [TextContent(
-                    type="text",
-                    text=log
-                )]
-                logging.error(f"[DEBUG] Returning TextContent with log")
-                return result
+        elif name == GitTools.RESET.value:  # Use .value
+            logging.error(f"[DEBUG] Matched RESET using .value")
+            result = git_reset(repo)
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.CREATE_BRANCH:
-                result = git_create_branch(
-                    repo,
-                    arguments["branch_name"],
-                    arguments.get("base_branch")
-                )
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.LOG.value:  # Use .value
+            logging.error(f"[DEBUG] Matched LOG using .value")
+            log = git_log(repo, int(arguments.get("max_count", 10)))
+            logging.error(f"[DEBUG] Log result received, length: {len(log)}")
+            result = [TextContent(
+                type="text",
+                text=log
+            )]
+            logging.error(f"[DEBUG] Returning TextContent with log")
+            return result
 
-            case GitTools.CHECKOUT:
-                result = git_checkout(repo, arguments["branch_name"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.CREATE_BRANCH.value:  # Use .value
+            logging.error(f"[DEBUG] Matched CREATE_BRANCH using .value")
+            result = git_create_branch(
+                repo,
+                arguments["branch_name"],
+                arguments.get("base_branch")
+            )
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.SHOW:
-                result = git_show(repo, arguments["revision"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.CHECKOUT.value:  # Use .value
+            logging.error(f"[DEBUG] Matched CHECKOUT using .value")
+            result = git_checkout(repo, arguments["branch_name"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case _:
-                raise ValueError(f"Unknown tool: {name}")
+        elif name == GitTools.SHOW.value:  # Use .value
+            logging.error(f"[DEBUG] Matched SHOW using .value")
+            result = git_show(repo, arguments["revision"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
+
+        else:
+            logging.error(f"[DEBUG] No match found for tool name: {name}")
+            raise ValueError(f"Unknown tool: {name}")
 
     @server.list_resources()
     async def handle_list_resources() -> list[Resource]:
