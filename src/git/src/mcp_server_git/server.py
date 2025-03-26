@@ -80,16 +80,28 @@ class GitTools(str, Enum):
     INIT = "git_init"
 
 def git_status(repo: git.Repo) -> str:
-    return repo.git.status()
+    try:
+        return repo.git.status()
+    except git.GitCommandError as e:
+        return f"Error getting status: {e}"
 
 def git_diff_unstaged(repo: git.Repo) -> str:
-    return repo.git.diff()
+    try:
+        return repo.git.diff()
+    except git.GitCommandError as e:
+        return f"Error getting unstaged diff: {e}"
 
 def git_diff_staged(repo: git.Repo) -> str:
-    return repo.git.diff("--cached")
+    try:
+        return repo.git.diff("--cached")
+    except git.GitCommandError as e:
+        return f"Error getting staged diff: {e}"
 
 def git_diff(repo: git.Repo, target: str) -> str:
-    return repo.git.diff(target)
+    try:
+        return repo.git.diff(target)
+    except git.GitCommandError as e:
+        return f"Error getting diff with {target}: {e}"
 
 def git_commit(repo: git.Repo, message: str) -> str:
     commit = repo.index.commit(message)
@@ -103,17 +115,20 @@ def git_reset(repo: git.Repo) -> str:
     repo.index.reset()
     return "All staged changes reset"
 
-def git_log(repo: git.Repo, max_count: int = 10) -> list[str]:
-    commits = list(repo.iter_commits(max_count=max_count))
-    log = []
-    for commit in commits:
-        log.append(
-            f"Commit: {commit.hexsha}\n"
-            f"Author: {commit.author}\n"
-            f"Date: {commit.authored_datetime}\n"
-            f"Message: {commit.message}\n"
-        )
-    return log
+def git_log(repo: git.Repo, max_count: int = 10) -> str:
+    try:
+        commits = list(repo.iter_commits(max_count=max_count))
+        log = []
+        for commit in commits:
+            log.append(
+                f"Commit: {commit.hexsha}\n"
+                f"Author: {commit.author}\n"
+                f"Date: {commit.authored_datetime}\n"
+                f"Message: {commit.message}\n"
+            )
+        return "\n".join(log)
+    except git.GitCommandError as e:
+        return f"Error getting commit logs: {e}"
 
 def git_create_branch(repo: git.Repo, branch_name: str, base_branch: str | None = None) -> str:
     if base_branch:
@@ -136,22 +151,25 @@ def git_init(repo_path: str) -> str:
         return f"Error initializing repository: {str(e)}"
 
 def git_show(repo: git.Repo, revision: str) -> str:
-    commit = repo.commit(revision)
-    output = [
-        f"Commit: {commit.hexsha}\n"
-        f"Author: {commit.author}\n"
-        f"Date: {commit.authored_datetime}\n"
-        f"Message: {commit.message}\n"
-    ]
-    if commit.parents:
-        parent = commit.parents[0]
-        diff = parent.diff(commit, create_patch=True)
-    else:
-        diff = commit.diff(git.NULL_TREE, create_patch=True)
-    for d in diff:
-        output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
-        output.append(d.diff.decode('utf-8'))
-    return "".join(output)
+    try:
+        commit = repo.commit(revision)
+        output = [
+            f"Commit: {commit.hexsha}\n"
+            f"Author: {commit.author}\n"
+            f"Date: {commit.authored_datetime}\n"
+            f"Message: {commit.message}\n"
+        ]
+        if commit.parents:
+            parent = commit.parents[0]
+            diff = parent.diff(commit, create_patch=True)
+        else:
+            diff = commit.diff(git.NULL_TREE, create_patch=True)
+        for d in diff:
+            output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
+            output.append(d.diff.decode('utf-8'))
+        return "".join(output)
+    except (git.GitCommandError, ValueError) as e:
+        return f"Error showing commit {revision}: {e}"
 
 async def serve(repository: Path | None) -> None:
     logger = logging.getLogger(__name__)
@@ -171,62 +189,62 @@ async def serve(repository: Path | None) -> None:
         return [
             Tool(
                 name=GitTools.STATUS,
-                description="Shows the working tree status",
+                description="Shows the working tree status. The repo_path must be the Git repository root.",
                 inputSchema=GitStatus.schema(),
             ),
             Tool(
                 name=GitTools.DIFF_UNSTAGED,
-                description="Shows changes in the working directory that are not yet staged",
+                description="Shows changes in the working directory that are not yet staged. The repo_path must be the Git repository root.",
                 inputSchema=GitDiffUnstaged.schema(),
             ),
             Tool(
                 name=GitTools.DIFF_STAGED,
-                description="Shows changes that are staged for commit",
+                description="Shows changes that are staged for commit. The repo_path must be the Git repository root.",
                 inputSchema=GitDiffStaged.schema(),
             ),
             Tool(
                 name=GitTools.DIFF,
-                description="Shows differences between branches or commits",
+                description="Shows differences between branches or commits. The repo_path must be the Git repository root.",
                 inputSchema=GitDiff.schema(),
             ),
             Tool(
                 name=GitTools.COMMIT,
-                description="Records changes to the repository",
+                description="Records changes to the repository. The repo_path must be the Git repository root.",
                 inputSchema=GitCommit.schema(),
             ),
             Tool(
                 name=GitTools.ADD,
-                description="Adds file contents to the staging area",
+                description="Adds file contents to the staging area. The repo_path must be the Git repository root.",
                 inputSchema=GitAdd.schema(),
             ),
             Tool(
                 name=GitTools.RESET,
-                description="Unstages all staged changes",
+                description="Unstages all staged changes. The repo_path must be the Git repository root.",
                 inputSchema=GitReset.schema(),
             ),
             Tool(
                 name=GitTools.LOG,
-                description="Shows the commit logs",
+                description="Shows the commit logs. The repo_path must be the Git repository root.",
                 inputSchema=GitLog.schema(),
             ),
             Tool(
                 name=GitTools.CREATE_BRANCH,
-                description="Creates a new branch from an optional base branch",
+                description="Creates a new branch from an optional base branch. The repo_path must be the Git repository root.",
                 inputSchema=GitCreateBranch.schema(),
             ),
             Tool(
                 name=GitTools.CHECKOUT,
-                description="Switches branches",
+                description="Switches branches. The repo_path must be the Git repository root.",
                 inputSchema=GitCheckout.schema(),
             ),
             Tool(
                 name=GitTools.SHOW,
-                description="Shows the contents of a commit",
+                description="Shows the contents of a commit. The repo_path must be the Git repository root.",
                 inputSchema=GitShow.schema(),
             ),
             Tool(
                 name=GitTools.INIT,
-                description="Initialize a new Git repository",
+                description="Initialize a new Git repository. The repo_path is the directory where the repository will be initialized.",
                 inputSchema=GitInit.schema(),
             )
         ]
@@ -265,7 +283,7 @@ async def serve(repository: Path | None) -> None:
         repo_path = Path(arguments["repo_path"])
         
         # Handle git init separately since it doesn't require an existing repo
-        if name == GitTools.INIT:
+        if name == GitTools.INIT.value:
             result = git_init(str(repo_path))
             return [TextContent(
                 type="text",
@@ -273,92 +291,123 @@ async def serve(repository: Path | None) -> None:
             )]
             
         # For all other commands, we need an existing repo
-        repo = git.Repo(repo_path)
+        try:
+            repo = git.Repo(repo_path)
+        except git.InvalidGitRepositoryError:
+            return [TextContent(
+                type="text",
+                text=(f"Error: '{repo_path}' is not a valid Git repository root. "
+                      f"Please provide the path to the repository root (the directory containing the '.git' folder), "
+                      f"not a subdirectory.")
+            )]
+        except git.NoSuchPathError:
+            return [TextContent(
+                type="text",
+                text=f"Error: Path '{repo_path}' does not exist."
+            )]
+        except Exception as e:
+            return [TextContent(
+                type="text",
+                text=f"Error accessing repository: {str(e)}"
+            )]
 
-        match name:
-            case GitTools.STATUS:
-                status = git_status(repo)
-                return [TextContent(
-                    type="text",
-                    text=f"Repository status:\n{status}"
-                )]
+        # Use string comparison instead of enum comparison
+        if name == GitTools.STATUS.value:  # Use .value
+            logging.error(f"[DEBUG] Matched STATUS using .value")
 
-            case GitTools.DIFF_UNSTAGED:
-                diff = git_diff_unstaged(repo)
-                return [TextContent(
-                    type="text",
-                    text=f"Unstaged changes:\n{diff}"
-                )]
+        if name == GitTools.STATUS.value:
+            status = git_status(repo)
+            return [TextContent(
+                type="text",
+                text=status
+            )]
 
-            case GitTools.DIFF_STAGED:
-                diff = git_diff_staged(repo)
-                return [TextContent(
-                    type="text",
-                    text=f"Staged changes:\n{diff}"
-                )]
+        elif name == GitTools.DIFF_UNSTAGED.value:  # Use .value
+            logging.error(f"[DEBUG] Matched DIFF_UNSTAGED using .value")
+            diff = git_diff_unstaged(repo)
+            return [TextContent(
+                type="text",
+                text=diff
+            )]
 
-            case GitTools.DIFF:
-                diff = git_diff(repo, arguments["target"])
-                return [TextContent(
-                    type="text",
-                    text=f"Diff with {arguments['target']}:\n{diff}"
-                )]
+        elif name == GitTools.DIFF_STAGED.value:  # Use .value
+            logging.error(f"[DEBUG] Matched DIFF_STAGED using .value")
+            diff = git_diff_staged(repo)
+            return [TextContent(
+                type="text",
+                text=diff
+            )]
 
-            case GitTools.COMMIT:
-                result = git_commit(repo, arguments["message"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.DIFF.value:  # Use .value
+            logging.error(f"[DEBUG] Matched DIFF using .value")
+            diff = git_diff(repo, arguments["target"])
+            return [TextContent(
+                type="text",
+                text=diff
+            )]
 
-            case GitTools.ADD:
-                result = git_add(repo, arguments["files"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.COMMIT.value:  # Use .value
+            logging.error(f"[DEBUG] Matched COMMIT using .value")
+            result = git_commit(repo, arguments["message"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.RESET:
-                result = git_reset(repo)
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.ADD.value:  # Use .value
+            logging.error(f"[DEBUG] Matched ADD using .value")
+            result = git_add(repo, arguments["files"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.LOG:
-                log = git_log(repo, arguments.get("max_count", 10))
-                return [TextContent(
-                    type="text",
-                    text="Commit history:\n" + "\n".join(log)
-                )]
+        elif name == GitTools.RESET.value:  # Use .value
+            logging.error(f"[DEBUG] Matched RESET using .value")
+            result = git_reset(repo)
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.CREATE_BRANCH:
-                result = git_create_branch(
-                    repo,
-                    arguments["branch_name"],
-                    arguments.get("base_branch")
-                )
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.LOG.value:
+            log = git_log(repo, int(arguments.get("max_count", 10)))
+            return [TextContent(
+                type="text",
+                text=log
+            )]
 
-            case GitTools.CHECKOUT:
-                result = git_checkout(repo, arguments["branch_name"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.CREATE_BRANCH.value:  # Use .value
+            logging.error(f"[DEBUG] Matched CREATE_BRANCH using .value")
+            result = git_create_branch(
+                repo,
+                arguments["branch_name"],
+                arguments.get("base_branch")
+            )
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case GitTools.SHOW:
-                result = git_show(repo, arguments["revision"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
+        elif name == GitTools.CHECKOUT.value:  # Use .value
+            logging.error(f"[DEBUG] Matched CHECKOUT using .value")
+            result = git_checkout(repo, arguments["branch_name"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
 
-            case _:
-                raise ValueError(f"Unknown tool: {name}")
+        elif name == GitTools.SHOW.value:  # Use .value
+            logging.error(f"[DEBUG] Matched SHOW using .value")
+            result = git_show(repo, arguments["revision"])
+            return [TextContent(
+                type="text",
+                text=result
+            )]
+
+        else:
+            logging.error(f"[DEBUG] No match found for tool name: {name}")
+            raise ValueError(f"Unknown tool: {name}")
 
     @server.list_resources()
     async def handle_list_resources() -> list[Resource]:
